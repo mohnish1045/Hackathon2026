@@ -1,0 +1,4 @@
+import { google } from "googleapis";
+import type { PlannerItem } from "@/lib/types";
+
+export async function fetchGoogleCalendarEvents(accessToken: string): Promise<PlannerItem[]> { const oauth = new google.auth.OAuth2(); oauth.setCredentials({ access_token: accessToken }); const calendar = google.calendar({ version: "v3", auth: oauth }); const events = await calendar.events.list({ calendarId: "primary", singleEvents: true, timeMin: new Date().toISOString(), maxResults: 250, orderBy: "startTime" }); return (events.data.items ?? []).map((event) => ({ id: `google-${event.id}`, title: event.summary || "Untitled event", description: event.description, type: "event", source: "google_calendar", sourceId: event.id, startAt: event.start?.dateTime || event.start?.date, endAt: event.end?.dateTime || event.end?.date, location: event.location, url: event.htmlLink, priority: "medium", completed: false, isFixed: true })); }

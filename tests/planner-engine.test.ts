@@ -1,0 +1,5 @@
+import { describe, expect, it } from "vitest";
+import { detectConflicts, proposeSchedule } from "@/lib/planner-engine";
+import type { PlannerItem } from "@/lib/types";
+const item = (values: Partial<PlannerItem>): PlannerItem => ({ id: crypto.randomUUID(), title: "Task", type: "task", source: "manual", priority: "high", completed: false, ...values });
+describe("planner engine", () => { it("identifies fixed calendar overlaps", () => { const start = new Date(); const first = item({ title: "Class", type: "event", startAt: start.toISOString(), endAt: new Date(start.getTime() + 60 * 60000).toISOString() }); const second = item({ title: "Meeting", type: "meeting", startAt: new Date(start.getTime() + 30 * 60000).toISOString(), endAt: new Date(start.getTime() + 90 * 60000).toISOString() }); expect(detectConflicts([first, second])).toHaveLength(1); }); it("schedules a task into a free weekday slot", () => { const due = new Date(); due.setDate(due.getDate() + 3); const proposals = proposeSchedule([item({ dueAt: due.toISOString(), estimatedMinutes: 60 })]); expect(proposals).toHaveLength(1); expect(proposals[0].title).toBe("Task"); }); });

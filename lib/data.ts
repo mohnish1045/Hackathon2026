@@ -1,0 +1,11 @@
+import { auth } from "@/auth";
+import { demoItems, demoSources } from "@/lib/demo-data";
+import { prisma } from "@/lib/prisma";
+import type { PlannerItem, SourceStatus } from "@/lib/types";
+
+const demoMode = () => process.env.DEMO_MODE !== "false" || !process.env.DATABASE_URL;
+export async function currentUserId() { if (demoMode()) return "demo-user"; const session = await auth(); return session?.user?.id ?? "demo-user"; }
+const mapItem = (item: any): PlannerItem => ({ ...item, type: item.type.toLowerCase(), source: item.source.toLowerCase(), priority: item.priority.toLowerCase(), startAt: item.startAt?.toISOString() ?? null, endAt: item.endAt?.toISOString() ?? null, dueAt: item.dueAt?.toISOString() ?? null });
+export async function getPlannerItems(): Promise<PlannerItem[]> { if (demoMode()) return demoItems; const userId = await currentUserId(); return (await prisma.plannerItem.findMany({ where: { userId }, orderBy: { dueAt: "asc" } })).map(mapItem); }
+export async function getSources(): Promise<SourceStatus[]> { if (demoMode()) return demoSources; const userId = await currentUserId(); return (await prisma.sourceConnection.findMany({ where: { userId } })).map((source) => ({ id: source.id, type: source.type.toLowerCase() as SourceStatus["type"], name: source.displayName, status: source.status.toLowerCase() as SourceStatus["status"], lastSyncedAt: source.lastSyncedAt?.toISOString(), error: source.lastError ?? undefined })); }
+export async function createPlannerItem(input: Omit<PlannerItem, "id" | "completed">): Promise<PlannerItem> { if (demoMode()) return { ...input, id: `${input.source}-${Date.now()}`, completed: false }; const userId = await currentUserId(); const item = await prisma.plannerItem.create({ data: { userId, title: input.title, description: input.description, type: input.type.toUpperCase() as any, source: input.source.toUpperCase() as any, sourceId: input.sourceId, course: input.course, startAt: input.startAt ? new Date(input.startAt) : null, endAt: input.endAt ? new Date(input.endAt) : null, dueAt: input.dueAt ? new Date(input.dueAt) : null, location: input.location, url: input.url, priority: input.priority.toUpperCase() as any, estimatedMinutes: input.estimatedMinutes, isFixed: input.isFixed ?? false, metadata: input.metadata as any } }); return mapItem(item); }

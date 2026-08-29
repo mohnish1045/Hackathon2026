@@ -1,0 +1,45 @@
+CREATE SCHEMA IF NOT EXISTS "public";
+CREATE TYPE "ItemType" AS ENUM ('ASSIGNMENT','EXAM','EVENT','DEADLINE','TASK','MEETING','STUDY_BLOCK');
+CREATE TYPE "ItemSource" AS ENUM ('CANVAS','GOOGLE_CALENDAR','WEB','MANUAL','AI');
+CREATE TYPE "Priority" AS ENUM ('LOW','MEDIUM','HIGH');
+CREATE TYPE "ConnectionType" AS ENUM ('CANVAS','GOOGLE_CALENDAR','WEB');
+CREATE TYPE "ConnectionStatus" AS ENUM ('CONNECTED','ERROR','PENDING','DISCONNECTED');
+CREATE TYPE "SuggestionStatus" AS ENUM ('PENDING','ACCEPTED','REJECTED');
+
+CREATE TABLE "User" ("id" TEXT PRIMARY KEY, "name" TEXT, "email" TEXT, "image" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "Account" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "type" TEXT NOT NULL, "provider" TEXT NOT NULL, "providerAccountId" TEXT NOT NULL, "refresh_token" TEXT, "access_token" TEXT, "expires_at" INTEGER, "token_type" TEXT, "scope" TEXT, "id_token" TEXT, "session_state" TEXT);
+CREATE TABLE "Session" ("id" TEXT PRIMARY KEY, "sessionToken" TEXT NOT NULL, "userId" TEXT NOT NULL, "expires" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "VerificationToken" ("identifier" TEXT NOT NULL, "token" TEXT NOT NULL, "expires" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "SourceConnection" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "type" "ConnectionType" NOT NULL, "status" "ConnectionStatus" NOT NULL DEFAULT 'PENDING', "displayName" TEXT NOT NULL, "config" JSONB, "lastSyncedAt" TIMESTAMP(3), "lastError" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "WebSource" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "url" TEXT NOT NULL, "title" TEXT, "extractedText" TEXT, "confidence" DOUBLE PRECISION, "approvedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "PlannerItem" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "sourceConnectionId" TEXT, "webSourceId" TEXT, "source" "ItemSource" NOT NULL, "sourceId" TEXT, "title" TEXT NOT NULL, "description" TEXT, "type" "ItemType" NOT NULL, "course" TEXT, "startAt" TIMESTAMP(3), "endAt" TIMESTAMP(3), "dueAt" TIMESTAMP(3), "location" TEXT, "url" TEXT, "priority" "Priority" NOT NULL DEFAULT 'MEDIUM', "estimatedMinutes" INTEGER, "completed" BOOLEAN NOT NULL DEFAULT false, "isFixed" BOOLEAN NOT NULL DEFAULT false, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "Task" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT NOT NULL, "description" TEXT, "dueAt" TIMESTAMP(3), "estimatedMinutes" INTEGER NOT NULL DEFAULT 60, "priority" "Priority" NOT NULL DEFAULT 'MEDIUM', "completed" BOOLEAN NOT NULL DEFAULT false, "plannerItemId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "AIConversation" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT NOT NULL DEFAULT 'New planning chat', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "AIMessage" ("id" TEXT PRIMARY KEY, "conversationId" TEXT NOT NULL, "role" TEXT NOT NULL, "content" TEXT NOT NULL, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "SuggestedSchedule" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT NOT NULL, "startAt" TIMESTAMP(3) NOT NULL, "endAt" TIMESTAMP(3) NOT NULL, "reason" TEXT NOT NULL, "relatedItemId" TEXT, "status" "SuggestionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "Account"("provider","providerAccountId");
+CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
+CREATE UNIQUE INDEX "VerificationToken_token_key" ON "VerificationToken"("token");
+CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier","token");
+CREATE UNIQUE INDEX "SourceConnection_userId_type_key" ON "SourceConnection"("userId","type");
+CREATE UNIQUE INDEX "PlannerItem_userId_source_sourceId_key" ON "PlannerItem"("userId","source","sourceId");
+CREATE UNIQUE INDEX "Task_plannerItemId_key" ON "Task"("plannerItemId");
+CREATE INDEX "PlannerItem_userId_startAt_idx" ON "PlannerItem"("userId","startAt");
+CREATE INDEX "PlannerItem_userId_dueAt_idx" ON "PlannerItem"("userId","dueAt");
+CREATE INDEX "PlannerItem_userId_source_idx" ON "PlannerItem"("userId","source");
+CREATE INDEX "Task_userId_dueAt_idx" ON "Task"("userId","dueAt");
+CREATE INDEX "SuggestedSchedule_userId_status_idx" ON "SuggestedSchedule"("userId","status");
+
+ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "SourceConnection" ADD CONSTRAINT "SourceConnection_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "WebSource" ADD CONSTRAINT "WebSource_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "PlannerItem" ADD CONSTRAINT "PlannerItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "PlannerItem" ADD CONSTRAINT "PlannerItem_sourceConnectionId_fkey" FOREIGN KEY ("sourceConnectionId") REFERENCES "SourceConnection"("id") ON DELETE SET NULL;
+ALTER TABLE "PlannerItem" ADD CONSTRAINT "PlannerItem_webSourceId_fkey" FOREIGN KEY ("webSourceId") REFERENCES "WebSource"("id") ON DELETE SET NULL;
+ALTER TABLE "Task" ADD CONSTRAINT "Task_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "AIConversation" ADD CONSTRAINT "AIConversation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
+ALTER TABLE "AIMessage" ADD CONSTRAINT "AIMessage_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "AIConversation"("id") ON DELETE CASCADE;
+ALTER TABLE "SuggestedSchedule" ADD CONSTRAINT "SuggestedSchedule_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE;
